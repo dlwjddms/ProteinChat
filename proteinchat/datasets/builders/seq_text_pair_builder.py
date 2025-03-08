@@ -17,6 +17,7 @@ class SeqBuilder(BaseDatasetBuilder):
         # at this point, all the annotations and image/videos should be all downloaded to the specified locations.
         logging.info("Building datasets...")
 
+
         build_info = self.config.build_info
         datasets = dict()       
         
@@ -30,10 +31,7 @@ class SeqBuilder(BaseDatasetBuilder):
             # create datasets
             dataset_cls = self.train_dataset_cls if is_train else self.eval_dataset_cls
             datasets[split] = dataset_cls(
-                kw_path = os.path.join(storage_path, 'qa_kw.json'),
-                text_rule_path = os.path.join(storage_path, 'qa_text_rule.json'),
-                text_manual_path = os.path.join(storage_path, 'qa_text_manual.json'),
-                seq_path = os.path.join(storage_path, 'seq.json'),
+                data_path = os.path.join(storage_path, 'train_sequence.json'),
             )
 
         return datasets

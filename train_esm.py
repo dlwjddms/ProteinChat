@@ -7,7 +7,8 @@
 import json
 import argparse
 import os
-os.environ['HF_HOME'] = '/data1/mingjia/cache/'
+os.environ['HF_HOME'] = '/home/je/cache'
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import random
 
 import numpy as np
@@ -31,6 +32,11 @@ from proteinchat.models import *
 from proteinchat.runners import *
 from proteinchat.tasks import *
 
+import warnings
+warnings.filterwarnings('ignore', message='Precision and F-score are ill-defined*')
+warnings.filterwarnings('ignore', message='Recall and F-score are ill-defined*')
+
+import wandb
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training")
@@ -67,23 +73,47 @@ def get_runner_class(cfg):
     return runner_cls
 
 
+import torch.distributed as dist
+def init_distributed_mode(run_cfg):
+
+    # Check if the process group is already initialized
+    if dist.is_initialized():
+        return
+
+    # Set the local device using the environment variable LOCAL_RANK
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    torch.cuda.set_device(local_rank)
+
+    # Initialize the default process group
+    dist.init_process_group(backend="nccl", init_method="env://")
+    print(f"Rank: {dist.get_rank()}, Device: {torch.cuda.current_device()}")
+
 def main():
     job_id = now()
     cfg = Config(parse_args())
     init_distributed_mode(cfg.run_cfg)
     setup_seeds(cfg)
-    setup_logger()
+    cfg_dict = cfg.to_dict()
     cfg.pretty_print()
+    if get_rank() == 0:
+        setup_logger()
+        wandb_run_name = cfg_dict['run']['output_dir'].split('/')[-1]
+        wandb.init(project="proteinchat", config=cfg_dict, name=wandb_run_name, job_type="training")
 
     task = tasks.setup_task(cfg)
     datasets = task.build_datasets(cfg)
     model = task.build_model(cfg)
-
+        
+     
+    
     runner = get_runner_class(cfg)(
         cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets
-    )
-
+        )
+    if get_rank() == 0:
+        wandb.watch(model, log="all", log_freq=5000)
     runner.train()
+    if get_rank() == 0:
+        wandb.finish()
 
 
 if __name__ == "__main__":

@@ -9,12 +9,13 @@ import logging
 import os
 import time
 import torch
+import gc
 import torch.distributed as dist
 from proteinchat.common.dist_utils import get_rank, get_world_size, is_main_process, is_dist_avail_and_initialized
 from proteinchat.common.logger import MetricLogger, SmoothedValue
 from proteinchat.common.registry import registry
 from proteinchat.datasets.data_utils import prepare_sample
-
+import wandb
 
 class BaseTask:
     def __init__(self, **kwargs):
@@ -288,9 +289,24 @@ class BaseTask:
                 optimizer.zero_grad()
             end_optimizer = time.time()
             # print(f"[base_task] _train_inner_loop end_optimizer: {end_optimizer - end_train_step}")
-            metric_logger.update(loss=loss.item())
-            metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+
+            metric_loss = loss.detach().cpu()
+            metric_lr = optimizer.param_groups[0]["lr"]
+            metric_logger.update(loss=metric_loss.item())
+            metric_logger.update(lr=metric_lr)
+            if get_rank() == 0:
+                wandb.log({
+                    "loss": metric_loss.item(),
+                    "learning_rate": metric_lr,
+                    "epoch": epoch,
+                    "iteration": i
+                })
             # print(f"[base_task] _train_inner_loop ITERATION end -----------------------------{time.time()-iter_start}")
+            ## JE
+            #del loss, metric_loss, samples
+            #gc.collect()
+            #torch.cuda.empty_cache()
+
 
         # after train_epoch()
         # gather the stats from all processes

@@ -2,7 +2,6 @@
 
 This repository holds the code and data of [Multi-Modal Large Language Model Enables Protein Function Prediction](https://www.biorxiv.org/content/10.1101/2024.08.19.608729v1).
 
-* Update on Jan 5, 2025: change protein encoder from ESM to xtrimoPGLM
 
 ## Examples
 
@@ -13,7 +12,7 @@ Examples of multi-round dialogues with ProteinChat for Q9U281, Q9XZG9, and Q9LU4
 ## Introduction
 - ProteinChat is a versatile, multi-modal large language model designed to predict protein functions from amino acid sequences.
 - ProteinChat works in a similar way as ChatGPT. Users upload a protein sequence and ask various questions about this protein. ProteinChat will answer these questions in a multi-turn, interactive manner. 
-- The ProteinChat system consists of a protein encoder, a large language model (LLM), and an adaptor. The protein encoder takes a protein sequence as input and learns a representation for this protein. The adaptor transforms the protein representation produced by the protein encoder into another representation that is acceptable to the LLM. The LLM takes the representation transformed by the adaptor and users' questions about this protein as inputs and generates answers. All these components are trained end-to-end. We use [xTrimoPGLM-1B](https://arxiv.org/abs/2401.06199) as the protein encoder.
+- The ProteinChat system consists of a protein encoder, a large language model (LLM), and an adaptor. The protein encoder takes a protein sequence as input and learns a representation for this protein. The adaptor transforms the protein representation produced by the protein encoder into another representation that is acceptable to the LLM. The LLM takes the representation transformed by the adaptor and users' questions about this protein as inputs and generates answers. All these components are trained end-to-end. We use [esm2_t33_650M_UR50D](https://github.com/facebookresearch/esm) as the protein encoder in this github repo. Note that in our paper, we use [xTrimoPGLM-1B](https://arxiv.org/abs/2401.06199) as the protein encoder, which can give better performance on the prediction tasks.
 - To train ProteinChat, we designed (protein, prompt, answer) triplets from the functions and keywords from Swiss-Prot dataset, resulting in ~500k proteins and 1.5 million triplets.
 
 ![overview](fig/workflow.png)
@@ -51,20 +50,6 @@ Please download Vicuna weights from [https://huggingface.co/lmsys/vicuna-13b-v1.
 Then, set the path to the vicuna weight in the config files 
 [configs/proteinchat_stage1.yaml](configs/proteinchat_stage1.yaml#L15) and [configs/proteinchat_stage2.yaml](configs/proteinchat_stage2.yaml#L15).
 
-**4. Prepare the xtrimoPGLM protein encoder**
-
-Download proteinglm-1b-mlm[https://huggingface.co/Bo1015/proteinglm-1b-mlm] to your local machine, and in your downloaded proteinglm folder, modify code Line715 - Line720 of [modeling_proteinglm.py](https://huggingface.co/Bo1015/proteinglm-1b-mlm/blob/main/modeling_proteinglm.py) to the following:
-```
-        if output_hidden_states:
-            all_hidden_states = all_hidden_states + (hidden_states,)
-
-        # Final layer norm.
-        if self.post_layer_norm:
-            hidden_states = self.final_layernorm(hidden_states)
-```
-
-Then in [configs/proteinchat_eval.yaml](configs/proteinchat_eval.yaml#L18), set `glm_load_path` to your local path of proteinglm.
-Also, download ProteinChat's trained weights from [Google Drive](https://drive.google.com/file/d/1H-POt4e5Q5fYF59ZwfSdAJyuQiJ2rtJl/view?usp=sharing) and set its path to `stage1_ckpt` in [configs/proteinchat_eval.yaml](configs/proteinchat_eval.yaml#L19).
 
 ### Training
 **You need at least 55 GB GPU memory for the training.** 
@@ -90,8 +75,7 @@ bash finetune.sh --cfg-path configs/proteinchat_stage2.yaml
 **It takes around 24 GB GPU memory for the inference.**
 
 Modify the checkpoint paths in [configs/proteinchat_eval.yaml](configs/proteinchat_eval.yaml) to the location of your checkpoint.
-Download our ProteinChat's stage1_ckpt [here](https://drive.google.com/file/d/1H-POt4e5Q5fYF59ZwfSdAJyuQiJ2rtJl/view?usp=sharing). peft_ckpt can be set empty during evaluation.
-To evaluate stage-2, [this parameter](configs/proteinchat_eval.yaml#L6) needs to be set False.
+We provide a stage1_ckpt [here](https://drive.google.com/file/d/1JSNiZft9TFS5jY5M2R_zQreG3ySP2NpA/view?usp=sharing) by training on 800,000 triplets. peft_ckpt can be set empty during evaluation.
 
 Evaluate on 20 samples on free-form function prediction and 10 samples for each specific-category prediction by running 
 ```bash
@@ -110,15 +94,3 @@ bash demo.sh
 
 ## License
 This repository is under [BSD 3-Clause License](LICENSE.md).
-
-
-## Citation
-
-If you're using ProteinChat in your research or applications, please cite using this BibTeX:
-```bibtex
-@article{huo2024multi,
-  title={Multi-modal large language model enables protein function prediction},
-  author={Huo, Mingjia and Guo, Han and Cheng, Xingyi and Singh, Digvijay and Rahmani, Hamidreza and Li, Shen and Gerlof, Philipp and Ideker, Trey and Grotjahn, Danielle A and Villa, Elizabeth and Song, Le and Xie, Pengtao},
-  year={2024}
-}
-```
